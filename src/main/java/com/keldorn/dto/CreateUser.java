@@ -4,8 +4,14 @@ public class CreateUser {
     private String email;
     private String name;
 
-    public CreateUser() {}
+    public CreateUser() {
+    }
 
-    public String getEmail() { return email; }
-    public String getName() { return name; }
+    public String getEmail() {
+        return email;
+    }
+
+    public String getName() {
+        return name;
+    }
 }

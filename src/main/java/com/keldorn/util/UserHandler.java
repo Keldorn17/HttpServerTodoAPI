@@ -5,14 +5,12 @@ import com.google.gson.GsonBuilder;
 import com.keldorn.dto.CreateUser;
 import com.keldorn.dto.UserResponseDto;
 import com.keldorn.entity.User;
-import com.keldorn.enums.Priority;
 
 import java.time.LocalDateTime;
 
 public class UserHandler {
     private final static Gson gson = new GsonBuilder()
             .registerTypeAdapter(LocalDateTime.class, new LocalDateTimeAdapter())
-            .registerTypeAdapter(Priority.class, new PriorityAdapter())
             .create();
 
     public static User handleCreateUserRequest(String requestBody) {

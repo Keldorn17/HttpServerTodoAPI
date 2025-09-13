@@ -5,10 +5,10 @@ import com.keldorn.entity.User;
 import java.util.List;
 
 public class UserResponseDto {
-    private int userId;
-    private String email;
-    private String name;
-    private List<TodoResponseDto> todos;
+    private final int userId;
+    private final String email;
+    private final String name;
+    private final List<TodoResponseDto> todos;
 
     public UserResponseDto(User user) {
         this.userId = user.getUserId();

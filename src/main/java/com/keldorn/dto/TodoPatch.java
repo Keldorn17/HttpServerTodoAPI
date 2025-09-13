@@ -2,23 +2,21 @@ package com.keldorn.dto;
 
 import com.keldorn.entity.Todo;
 
-public class TodoResponseDto {
-    private final int todoId;
+import java.time.LocalDateTime;
+
+public class TodoPatch {
     private final String title;
     private final String description;
-    private final boolean completed;
-    private final int priority;
+    private final LocalDateTime dueDate;
+    private final Boolean completed;
+    private final Integer priority;
 
-    public TodoResponseDto(Todo todo) {
-        this.todoId = todo.getTodoId();
+    public TodoPatch(Todo todo) {
         this.title = todo.getTitle();
         this.description = todo.getDescription();
+        this.dueDate = todo.getDueDate();
         this.completed = todo.isCompleted();
         this.priority = todo.getPriority().ordinal();
-    }
-
-    public int getTodoId() {
-        return todoId;
     }
 
     public String getTitle() {
@@ -29,11 +27,15 @@ public class TodoResponseDto {
         return description;
     }
 
-    public boolean isCompleted() {
+    public LocalDateTime getDueDate() {
+        return dueDate;
+    }
+
+    public Boolean isCompleted() {
         return completed;
     }
 
-    public int getPriority() {
+    public Integer getPriority() {
         return priority;
     }
 }

@@ -28,20 +28,18 @@ public class UserHttpHandler implements HttpHandler {
             switch (method) {
                 case "POST" -> handlePost(exchange, entityManager);
                 case "GET" -> handleGet(exchange, entityManager);
-                default -> HttpHelper.writeResponse("{\"error\":\"Unsupported method\"}",
-                        HttpURLConnection.HTTP_BAD_METHOD, exchange);
+                default -> HttpHelper.sendJsonError(exchange, HttpURLConnection.HTTP_BAD_METHOD,
+                        "Unsupported method");
             }
         } catch (Exception e) {
-            String error = "{\"error\":\"" + e.getMessage() + "\"}";
-            HttpHelper.writeResponse(error, HttpURLConnection.HTTP_INTERNAL_ERROR, exchange);
+            HttpHelper.sendJsonError(exchange, HttpURLConnection.HTTP_INTERNAL_ERROR, e.getMessage());
         } finally {
             exchange.close();
         }
     }
 
     private void handleGet(HttpExchange exchange, EntityManager entityManager) throws IOException {
-        String error = "{\"error\":\"User ID missing\"}";
-        int userId = HttpHelper.getIdFromURI(exchange, 2, error);
+        int userId = HttpHelper.getIdFromURI(exchange, 2, "User ID missing");
         if (userId != -1) {
             handleGetUserResponse(userId, entityManager, exchange);
         }
@@ -53,9 +51,8 @@ public class UserHttpHandler implements HttpHandler {
 
         ValidifyEmail.validify(user.getEmail());
         new UserRepository(entityManager).save(user);
-        var response = "{\"userId\": %d}"
-                .formatted(user.getUserId());
-        HttpHelper.writeResponse(response, HttpURLConnection.HTTP_CREATED, exchange);
+        HttpHelper.writeResponse(exchange, HttpURLConnection.HTTP_CREATED,
+                "{\"userId\": %d}".formatted(user.getUserId()));
     }
 
     private static void handleGetUserResponse(int id, EntityManager entityManager, HttpExchange exchange)
@@ -63,11 +60,10 @@ public class UserHttpHandler implements HttpHandler {
         User user = new UserRepository(entityManager).findById(id);
 
         if (user == null) {
-            String notFound = "{\"error\":\"User not found\"}";
-            HttpHelper.writeResponse(notFound, HttpURLConnection.HTTP_NOT_FOUND, exchange);
+            HttpHelper.sendJsonError(exchange, HttpURLConnection.HTTP_NOT_FOUND, "User not found");
         } else {
-            String response = UserHandler.getJsonUser(user);
-            HttpHelper.writeResponse(response, HttpURLConnection.HTTP_OK, exchange);
+            HttpHelper.writeResponse(exchange, HttpURLConnection.HTTP_OK,
+                    UserHandler.getJsonUser(user));
         }
     }
 }

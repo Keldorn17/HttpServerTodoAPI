@@ -1,8 +1,9 @@
 package com.keldorn.server;
 
+import com.google.gson.JsonSyntaxException;
 import com.keldorn.dto.CreateTodo;
+import com.keldorn.dto.TodoPatch;
 import com.keldorn.entity.Todo;
-import com.keldorn.entity.User;
 import com.keldorn.repository.TodoRepository;
 import com.keldorn.repository.UserRepository;
 import com.keldorn.util.HttpHelper;
@@ -13,10 +14,12 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 import java.net.HttpURLConnection;
 
 public class TodoHttpHandler implements HttpHandler {
     private final EntityManagerFactory emf;
+    private final String TODO_ID_MISSING = "Todo ID missing";
 
     public TodoHttpHandler(EntityManagerFactory emf) {
         this.emf = emf;
@@ -30,82 +33,75 @@ public class TodoHttpHandler implements HttpHandler {
                 case "GET" -> handleGet(exchange, entityManager);
                 case "POST" -> handlePost(exchange, entityManager);
                 case "DELETE" -> handleDelete(exchange, entityManager);
-                default -> HttpHelper.writeResponse("{\"error\":\"Unsupported method\"}",
-                        HttpURLConnection.HTTP_BAD_METHOD, exchange);
+                case "PATCH" -> handlePatch(exchange, entityManager);
+                default -> HttpHelper.sendJsonError(exchange, HttpURLConnection.HTTP_BAD_METHOD,
+                        "Unsupported method");
             }
         } catch (Exception e) {
-            String error = "{\"error\":\"" + e.getMessage() + "\"}";
-            HttpHelper.writeResponse(error, HttpURLConnection.HTTP_INTERNAL_ERROR, exchange);
+            HttpHelper.sendJsonError(exchange, HttpURLConnection.HTTP_INTERNAL_ERROR, e.getMessage());
         } finally {
             exchange.close();
         }
     }
 
     private void handleDelete(HttpExchange exchange, EntityManager entityManager) throws IOException {
-        String error = "{\"error\":\"Todo ID missing\"}";
-        int todoId = HttpHelper.getIdFromURI(exchange, 2, error);
+        int todoId = HttpHelper.getIdFromURI(exchange, 2, TODO_ID_MISSING);
         if (todoId != -1) {
-            handleDeleteTodoResponse(todoId, entityManager, exchange);
+            TodoRepository todoRepository = new TodoRepository(entityManager);
+            Todo todo = todoRepository.findById(todoId);
+            if (todo == null) {
+                HttpHelper.sendJsonError(exchange, HttpURLConnection.HTTP_NOT_FOUND, "Todo not found");
+            } else {
+                todoRepository.delete(todo);
+                HttpHelper.sendJsonResult(exchange, HttpURLConnection.HTTP_OK,
+                        "Todo successfully deleted");
+            }
         }
     }
 
     private void handlePost(HttpExchange exchange, EntityManager entityManager) throws IOException {
         String data = new String(exchange.getRequestBody().readAllBytes());
         CreateTodo dto = TodoHandler.handleCreateTodoRequest(data);
-        Todo todo = saveTodo(dto, entityManager);
-        String response = "{\"todoId\": %d}".formatted(todo.getTodoId());
-        HttpHelper.writeResponse(response, HttpURLConnection.HTTP_CREATED, exchange);
+        Todo todo = dto.getTodo();
+        todo.setUser(new UserRepository(entityManager).findById(dto.getUserId()));
+        new TodoRepository(entityManager).save(todo);
+        HttpHelper.writeResponse(exchange, HttpURLConnection.HTTP_CREATED,
+                TodoHandler.getTodoResponse(todo));
     }
 
     private void handleGet(HttpExchange exchange, EntityManager entityManager) throws IOException {
-        String error = "{\"error\":\"Todo ID missing\"}";
-        int todoId = HttpHelper.getIdFromURI(exchange, 2, error);
+        int todoId = HttpHelper.getIdFromURI(exchange, 2, TODO_ID_MISSING);
         if (todoId != -1) {
-            handleGetTodoResponse(todoId, entityManager, exchange);
+            Todo todo = new TodoRepository(entityManager).findById(todoId);
+            if (todo == null) {
+                HttpHelper.sendJsonError(exchange, HttpURLConnection.HTTP_NOT_FOUND,
+                        "Todo not found");
+            } else {
+                HttpHelper.writeResponse(exchange, HttpURLConnection.HTTP_OK,
+                        TodoHandler.getTodoResponse(todo));
+            }
         }
     }
 
-    private Todo saveTodo(CreateTodo dto, EntityManager entityManager) {
-        Todo todo = dto.getTodo();
-        User user = new UserRepository(entityManager).findById(dto.getUserId());
-        todo.setUser(user);
-        new TodoRepository(entityManager).save(todo);
-        return todo;
-    }
-
-    private static void handleGetTodoResponse(int id, EntityManager entityManager, HttpExchange exchange)
-            throws IOException {
-        Todo todo = new TodoRepository(entityManager).findById(id);
-        if (todo == null) {
-            String notFound = "{\"error\":\"Todo not found\"}";
-            HttpHelper.writeResponse(notFound, HttpURLConnection.HTTP_NOT_FOUND, exchange);
-        } else {
-            String response = """
-                    {
-                      "title": "%s",
-                      "description": "%s",
-                      "dueDate": "%s",
-                      "completed": %s,
-                      "priority": %d,
-                      "userId": %d
-                    }""".formatted(todo.getTitle(), todo.getDescription(), todo.getDueDate(), todo.isCompleted(),
-                    todo.getPriority().ordinal(), todo.getUser().getUserId());
-            HttpHelper.writeResponse(response, HttpURLConnection.HTTP_OK, exchange);
+    private void handlePatch(HttpExchange exchange, EntityManager entityManager) throws IOException {
+        int todoId = HttpHelper.getIdFromURI(exchange, 2, TODO_ID_MISSING);
+        if (todoId != -1) {
+            String data = new String(exchange.getRequestBody().readAllBytes());
+            try {
+                TodoPatch dto = TodoHandler.handlePatchTodoRequest(data);
+                Todo todo = new TodoRepository(entityManager).patch(dto, todoId);
+                HttpHelper.writeResponse(exchange, HttpURLConnection.HTTP_OK,
+                        TodoHandler.getTodoResponse(todo));
+            } catch (JsonSyntaxException e) {
+                HttpHelper.sendJsonError(exchange, HttpURLConnection.HTTP_BAD_REQUEST,
+                        "Malformed JSON in request body. Please check syntax and field names.");
+            } catch (InvocationTargetException | IllegalAccessException e) {
+                HttpHelper.sendJsonError(exchange, HttpURLConnection.HTTP_INTERNAL_ERROR,
+                        "Internal server error: " + e.getMessage());
+            } catch (Exception e) {
+                HttpHelper.sendJsonError(exchange, HttpURLConnection.HTTP_INTERNAL_ERROR,
+                        "Unexpected error: " + e.getMessage());
+            }
         }
-    }
-
-    private static void handleDeleteTodoResponse(int id, EntityManager entityManager, HttpExchange exchange)
-            throws IOException {
-        TodoRepository todoRepository = new TodoRepository(entityManager);
-        Todo todo = todoRepository.findById(id);
-        if (todo == null) {
-            String notFound = "{\"error\":\"Todo not found\"}";
-            HttpHelper.writeResponse(notFound, HttpURLConnection.HTTP_NOT_FOUND, exchange);
-        } else {
-            todoRepository.delete(todo);
-            String response = "{\"result\": \"Todo successfully deleted\"}";
-            HttpHelper.writeResponse(response, HttpURLConnection.HTTP_OK, exchange);
-        }
-
     }
 }
