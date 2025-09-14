@@ -80,7 +80,7 @@ public class TodoRepository {
         }
     }
 
-    public Todo patchWithoutReflection(TodoPatch dto, int todoId) {
+    public Todo put(TodoPatch dto, int todoId) {
         Todo todo = em.find(Todo.class, todoId);
         if (dto.getTitle() != null) {
             todo.setTitle(dto.getTitle());

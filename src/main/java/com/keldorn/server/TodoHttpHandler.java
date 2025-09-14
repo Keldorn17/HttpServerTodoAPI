@@ -34,6 +34,7 @@ public class TodoHttpHandler implements HttpHandler {
                 case "POST" -> handlePost(exchange, entityManager);
                 case "DELETE" -> handleDelete(exchange, entityManager);
                 case "PATCH" -> handlePatch(exchange, entityManager);
+                case "PUT" -> handlePut(exchange, entityManager);
                 default -> HttpHelper.sendJsonError(exchange, HttpURLConnection.HTTP_BAD_METHOD,
                         "Unsupported method");
             }
@@ -41,6 +42,25 @@ public class TodoHttpHandler implements HttpHandler {
             HttpHelper.sendJsonError(exchange, HttpURLConnection.HTTP_INTERNAL_ERROR, e.getMessage());
         } finally {
             exchange.close();
+        }
+    }
+
+    private void handlePut(HttpExchange exchange, EntityManager entityManager) throws IOException {
+        int todoId = HttpHelper.getIdFromURI(exchange, 2, TODO_ID_MISSING);
+        if (todoId != -1) {
+            String data = new String(exchange.getRequestBody().readAllBytes());
+            try {
+                TodoPatch dto = TodoHandler.handlePatchTodoRequest(data);
+                Todo todo = new TodoRepository(entityManager).put(dto, todoId);
+                HttpHelper.writeResponse(exchange, HttpURLConnection.HTTP_OK,
+                        TodoHandler.getTodoResponse(todo));
+            } catch (JsonSyntaxException e) {
+                HttpHelper.sendJsonError(exchange, HttpURLConnection.HTTP_BAD_REQUEST,
+                        "Malformed JSON in request body. Please check syntax and field names.");
+            } catch (Exception e) {
+                HttpHelper.sendJsonError(exchange, HttpURLConnection.HTTP_INTERNAL_ERROR,
+                        "Unexpected error: " + e.getMessage());
+            }
         }
     }
 
