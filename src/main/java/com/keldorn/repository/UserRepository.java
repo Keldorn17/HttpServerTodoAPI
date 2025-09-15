@@ -1,9 +1,11 @@
 package com.keldorn.repository;
 
+import com.keldorn.entity.Todo;
+import com.keldorn.entity.User;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityTransaction;
-import com.keldorn.entity.User;
 
+import java.util.List;
 import java.util.stream.Stream;
 
 public class UserRepository {
@@ -26,6 +28,12 @@ public class UserRepository {
 
     public Stream<User> findAll() {
         return em.createQuery("SELECT u FROM User u", User.class).getResultStream();
+    }
+
+    public List<Todo> findTodosByUserId(int id) {
+        return em.createQuery("SELECT t FROM Todo t WHERE t.user.userId = :userId", Todo.class)
+                .setParameter("userId", id)
+                .getResultList();
     }
 
     public void delete(User user) {

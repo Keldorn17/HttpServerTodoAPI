@@ -1,10 +1,12 @@
 package com.keldorn.server;
 
+import com.keldorn.constants.UserConstants;
 import com.keldorn.entity.User;
-import com.keldorn.exceptions.InvalidEmailException;
+import com.keldorn.exception.InvalidEmailException;
+import com.keldorn.handler.TodoHandler;
+import com.keldorn.handler.UserHandler;
 import com.keldorn.repository.UserRepository;
 import com.keldorn.util.HttpHelper;
-import com.keldorn.util.UserHandler;
 import com.keldorn.util.ValidifyEmail;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
@@ -39,9 +41,14 @@ public class UserHttpHandler implements HttpHandler {
     }
 
     private void handleGet(HttpExchange exchange, EntityManager entityManager) throws IOException {
-        int userId = HttpHelper.getIdFromURI(exchange, 2, "User ID missing");
-        if (userId != -1) {
-            handleGetUserResponse(userId, entityManager, exchange);
+        var dto = HttpHelper.getUriCompactAddress(exchange, 2, "User ID missing");
+        if (dto != null) {
+            switch (dto.idCapsulatedUriString()) {
+                case UserConstants.USER_TEMPLATE -> handleGetUser(dto.id(), entityManager, exchange);
+                case UserConstants.USER_TODOS_TEMPLATE -> handleGetUserTodos(dto.id(), entityManager, exchange);
+                default -> HttpHelper.sendJsonError(exchange, HttpURLConnection.HTTP_NOT_FOUND,
+                        "This endpoint does not exists.");
+            }
         }
     }
 
@@ -55,7 +62,7 @@ public class UserHttpHandler implements HttpHandler {
                 "{\"userId\": %d}".formatted(user.getUserId()));
     }
 
-    private static void handleGetUserResponse(int id, EntityManager entityManager, HttpExchange exchange)
+    private static void handleGetUser(int id, EntityManager entityManager, HttpExchange exchange)
             throws IOException {
         User user = new UserRepository(entityManager).findById(id);
 
@@ -64,6 +71,18 @@ public class UserHttpHandler implements HttpHandler {
         } else {
             HttpHelper.writeResponse(exchange, HttpURLConnection.HTTP_OK,
                     UserHandler.getJsonUser(user));
+        }
+    }
+
+    private static void handleGetUserTodos(int id, EntityManager entityManager, HttpExchange exchange)
+            throws IOException {
+        var todos = new UserRepository(entityManager).findTodosByUserId(id);
+
+        if (todos.isEmpty()) {
+            HttpHelper.sendJsonError(exchange, HttpURLConnection.HTTP_NOT_FOUND, "User not found");
+        } else {
+            HttpHelper.writeResponse(exchange, HttpURLConnection.HTTP_OK,
+                    TodoHandler.getTodosResponse(todos));
         }
     }
 }

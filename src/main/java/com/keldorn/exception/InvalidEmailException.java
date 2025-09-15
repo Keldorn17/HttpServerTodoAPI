@@ -1,4 +1,4 @@
-package com.keldorn.exceptions;
+package com.keldorn.exception;
 
 public class InvalidEmailException extends Exception {
     public InvalidEmailException() {

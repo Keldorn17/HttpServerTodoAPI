@@ -7,7 +7,7 @@ import com.keldorn.entity.Todo;
 import com.keldorn.repository.TodoRepository;
 import com.keldorn.repository.UserRepository;
 import com.keldorn.util.HttpHelper;
-import com.keldorn.util.TodoHandler;
+import com.keldorn.handler.TodoHandler;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import jakarta.persistence.EntityManager;

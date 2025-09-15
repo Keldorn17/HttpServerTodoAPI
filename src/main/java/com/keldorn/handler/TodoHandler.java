@@ -1,4 +1,4 @@
-package com.keldorn.util;
+package com.keldorn.handler;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -7,8 +7,11 @@ import com.keldorn.dto.TodoGet;
 import com.keldorn.dto.TodoPatch;
 import com.keldorn.entity.Todo;
 import com.keldorn.enums.Priority;
+import com.keldorn.util.LocalDateTimeAdapter;
+import com.keldorn.util.PriorityAdapter;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 public class TodoHandler {
     private final static Gson gson = new GsonBuilder()
@@ -26,5 +29,11 @@ public class TodoHandler {
 
     public static String getTodoResponse(Todo todo) {
         return gson.toJson(new TodoGet(todo));
+    }
+
+    public static String getTodosResponse(List<Todo> todo) {
+        return gson.toJson(todo.stream()
+                .map(TodoGet::new)
+                .toList());
     }
 }

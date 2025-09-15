@@ -1,6 +1,6 @@
 package com.keldorn.util;
 
-import com.keldorn.exceptions.InvalidEmailException;
+import com.keldorn.exception.InvalidEmailException;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
