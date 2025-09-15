@@ -1,8 +1,8 @@
 package com.keldorn.server;
 
+import com.keldorn.util.JpaUtil;
 import com.sun.net.httpserver.HttpServer;
 import jakarta.persistence.EntityManagerFactory;
-import jakarta.persistence.Persistence;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -12,7 +12,7 @@ public class TodoAPI {
 
     public static void main(String[] args) {
         try {
-            emf = Persistence.createEntityManagerFactory("main.java.com.keldorn.entity");
+            emf = JpaUtil.getEntityManagerFactory();
             HttpServer server = HttpServer.create(new InetSocketAddress(8080), 0);
 
             server.createContext("/users", new UserHttpHandler(emf));
