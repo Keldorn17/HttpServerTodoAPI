@@ -1,5 +1,6 @@
 package com.keldorn.server;
 
+import com.keldorn.constants.ApiRoutes;
 import com.keldorn.util.JpaUtil;
 import com.sun.net.httpserver.HttpServer;
 import jakarta.persistence.EntityManagerFactory;
@@ -15,8 +16,8 @@ public class TodoAPI {
             emf = JpaUtil.getEntityManagerFactory();
             HttpServer server = HttpServer.create(new InetSocketAddress(8080), 0);
 
-            server.createContext("/users", new UserHttpHandler(emf));
-            server.createContext("/todos", new TodoHttpHandler(emf));
+            server.createContext(ApiRoutes.BASE_USERS, new UserHttpHandler(emf));
+            server.createContext(ApiRoutes.BASE_TODOS, new TodoHttpHandler(emf));
             server.start();
             System.out.println("Server is listening on port 8080...");
 

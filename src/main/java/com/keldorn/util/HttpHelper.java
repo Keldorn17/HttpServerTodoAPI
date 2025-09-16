@@ -5,6 +5,7 @@ import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
 import java.net.HttpURLConnection;
+import java.util.OptionalInt;
 
 public class HttpHelper {
     public static void writeResponse(HttpExchange exchange, int statusCode, String message) throws IOException {
@@ -14,33 +15,36 @@ public class HttpHelper {
     }
 
     public static void sendJsonError(HttpExchange exchange, int statusCode, String message) throws IOException {
-        long timestamp = System.currentTimeMillis();
-        String json = String.format(
-                "{\"error\": {\"code\": %d, \"message\": \"%s\", \"timestamp\": %d}}",
-                statusCode, message, timestamp
-        );
-        writeResponse(exchange, statusCode, json);
+        writeResponse(exchange, statusCode, wrapMessage("error", statusCode, message));
+    }
+
+    public static void sendJsonUnknownEndpoint(HttpExchange exchange) throws IOException {
+        sendJsonError(exchange, HttpURLConnection.HTTP_NOT_FOUND, "This endpoint does not exists.");
+    }
+
+    public static void sendJsonUnsupportedMethod(HttpExchange exchange) throws IOException {
+        sendJsonError(exchange, HttpURLConnection.HTTP_BAD_METHOD, "Unsupported Method");
+    }
+
+    public static void sendJsonMalformedJson(HttpExchange exchange) throws IOException {
+        sendJsonError(exchange, HttpURLConnection.HTTP_BAD_REQUEST,
+                "Malformed JSON in request body. Please check syntax and field names.");
     }
 
     public static void sendJsonResult(HttpExchange exchange, int statusCode, String message) throws IOException {
-        long timestamp = System.currentTimeMillis();
-        String json = String.format(
-                "{\"result\": {\"code\": %d, \"message\": \"%s\", \"timestamp\": %d}}",
-                statusCode, message, timestamp
-        );
-        writeResponse(exchange, statusCode, json);
+        writeResponse(exchange, statusCode, wrapMessage("result", statusCode, message));
     }
 
-    public static int getIdFromURI(HttpExchange exchange, int idSegmentIndex, String errorMsg) throws IOException {
+    public static OptionalInt getIdFromURI(HttpExchange exchange, int idSegmentIndex, String errorMsg) throws IOException {
         String path = exchange.getRequestURI().getPath().replaceAll("/+$", "");
         String[] segments = path.split("/");
         if (segments.length < idSegmentIndex + 1) {
             sendJsonError(exchange, HttpURLConnection.HTTP_BAD_REQUEST, errorMsg);
-            return -1;
+            return OptionalInt.empty();
         }
-        int response = -1;
+        OptionalInt response = OptionalInt.empty();
         try {
-            response = Integer.parseInt(segments[idSegmentIndex]);
+            response = OptionalInt.of(Integer.parseInt(segments[idSegmentIndex]));
         } catch (NumberFormatException e) {
             sendJsonError(exchange, HttpURLConnection.HTTP_BAD_REQUEST, "The id parameter is not a valid integer.");
         }
@@ -62,5 +66,11 @@ public class HttpHelper {
             return null;
         }
         return new UriCompactAddress(response, path.replace("/%d".formatted(response), "/{id}"));
+    }
+
+    private static String wrapMessage(String type, int statusCode, String message) {
+        long timestamp = System.currentTimeMillis();
+        return String.format("{\"%s\": {\"code\": %d, \"message\": \"%s\", \"timestamp\": %d}}",
+                type, statusCode, message, timestamp);
     }
 }

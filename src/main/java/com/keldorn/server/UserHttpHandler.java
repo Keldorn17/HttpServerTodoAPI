@@ -1,6 +1,7 @@
 package com.keldorn.server;
 
-import com.keldorn.constants.UserConstants;
+import com.keldorn.constants.ApiRoutes;
+import com.keldorn.constants.UserConstant;
 import com.keldorn.entity.User;
 import com.keldorn.exception.InvalidEmailException;
 import com.keldorn.handler.TodoHandler;
@@ -12,6 +13,7 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
+import org.hibernate.exception.ConstraintViolationException;
 
 import java.io.IOException;
 import java.net.HttpURLConnection;
@@ -30,8 +32,8 @@ public class UserHttpHandler implements HttpHandler {
             switch (method) {
                 case "POST" -> handlePost(exchange, entityManager);
                 case "GET" -> handleGet(exchange, entityManager);
-                default -> HttpHelper.sendJsonError(exchange, HttpURLConnection.HTTP_BAD_METHOD,
-                        "Unsupported method");
+                case "DELETE" -> handleDelete(exchange, entityManager);
+                default -> HttpHelper.sendJsonUnsupportedMethod(exchange);
             }
         } catch (Exception e) {
             HttpHelper.sendJsonError(exchange, HttpURLConnection.HTTP_INTERNAL_ERROR, e.getMessage());
@@ -40,14 +42,27 @@ public class UserHttpHandler implements HttpHandler {
         }
     }
 
+    private void handleDelete(HttpExchange exchange, EntityManager entityManager) throws IOException {
+        var userId = HttpHelper.getIdFromURI(exchange, 2, UserConstant.USER_ID_MISSING);
+        if (userId.isPresent()) {
+            UserRepository userRepository = new UserRepository(entityManager);
+            User user = userRepository.findById(userId.getAsInt());
+            if (user == null) {
+                HttpHelper.sendJsonError(exchange, HttpURLConnection.HTTP_NOT_FOUND, UserConstant.USER_NOT_FOUND);
+            } else {
+                userRepository.delete(user);
+                HttpHelper.sendJsonResult(exchange, HttpURLConnection.HTTP_OK, "User successfully deleted.");
+            }
+        }
+    }
+
     private void handleGet(HttpExchange exchange, EntityManager entityManager) throws IOException {
-        var dto = HttpHelper.getUriCompactAddress(exchange, 2, "User ID missing");
+        var dto = HttpHelper.getUriCompactAddress(exchange, 2, UserConstant.USER_ID_MISSING);
         if (dto != null) {
             switch (dto.idCapsulatedUriString()) {
-                case UserConstants.USER_TEMPLATE -> handleGetUser(dto.id(), entityManager, exchange);
-                case UserConstants.USER_TODOS_TEMPLATE -> handleGetUserTodos(dto.id(), entityManager, exchange);
-                default -> HttpHelper.sendJsonError(exchange, HttpURLConnection.HTTP_NOT_FOUND,
-                        "This endpoint does not exists.");
+                case ApiRoutes.USER_BY_ID -> handleGetUser(dto.id(), entityManager, exchange);
+                case ApiRoutes.USER_TODOS -> handleGetUserTodos(dto.id(), entityManager, exchange);
+                default -> HttpHelper.sendJsonUnknownEndpoint(exchange);
             }
         }
     }
@@ -55,9 +70,12 @@ public class UserHttpHandler implements HttpHandler {
     private void handlePost(HttpExchange exchange, EntityManager entityManager) throws IOException, InvalidEmailException {
         String data = new String(exchange.getRequestBody().readAllBytes());
         User user = UserHandler.handleCreateUserRequest(data);
-
         ValidifyEmail.validify(user.getEmail());
-        new UserRepository(entityManager).save(user);
+        try {
+            new UserRepository(entityManager).save(user);
+        } catch (ConstraintViolationException e) {
+            HttpHelper.sendJsonError(exchange, HttpURLConnection.HTTP_CONFLICT, "Email already exists");
+        }
         HttpHelper.writeResponse(exchange, HttpURLConnection.HTTP_CREATED,
                 "{\"userId\": %d}".formatted(user.getUserId()));
     }
@@ -67,10 +85,10 @@ public class UserHttpHandler implements HttpHandler {
         User user = new UserRepository(entityManager).findById(id);
 
         if (user == null) {
-            HttpHelper.sendJsonError(exchange, HttpURLConnection.HTTP_NOT_FOUND, "User not found");
+            HttpHelper.sendJsonError(exchange, HttpURLConnection.HTTP_NOT_FOUND, UserConstant.USER_NOT_FOUND);
         } else {
             HttpHelper.writeResponse(exchange, HttpURLConnection.HTTP_OK,
-                    UserHandler.getJsonUser(user));
+                    UserHandler.getJsonUserDetailed(user));
         }
     }
 
@@ -79,7 +97,7 @@ public class UserHttpHandler implements HttpHandler {
         var todos = new UserRepository(entityManager).findTodosByUserId(id);
 
         if (todos.isEmpty()) {
-            HttpHelper.sendJsonError(exchange, HttpURLConnection.HTTP_NOT_FOUND, "User not found");
+            HttpHelper.sendJsonError(exchange, HttpURLConnection.HTTP_NOT_FOUND, UserConstant.USER_NOT_FOUND);
         } else {
             HttpHelper.writeResponse(exchange, HttpURLConnection.HTTP_OK,
                     TodoHandler.getTodosResponse(todos));

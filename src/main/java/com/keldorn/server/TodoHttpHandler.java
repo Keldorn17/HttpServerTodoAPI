@@ -1,9 +1,12 @@
 package com.keldorn.server;
 
 import com.google.gson.JsonSyntaxException;
+import com.keldorn.constants.ApiRoutes;
+import com.keldorn.constants.TodoConstant;
 import com.keldorn.dto.CreateTodo;
 import com.keldorn.dto.TodoPatch;
 import com.keldorn.entity.Todo;
+import com.keldorn.handler.UserHandler;
 import com.keldorn.repository.TodoRepository;
 import com.keldorn.repository.UserRepository;
 import com.keldorn.util.HttpHelper;
@@ -19,7 +22,6 @@ import java.net.HttpURLConnection;
 
 public class TodoHttpHandler implements HttpHandler {
     private final EntityManagerFactory emf;
-    private final String TODO_ID_MISSING = "Todo ID missing";
 
     public TodoHttpHandler(EntityManagerFactory emf) {
         this.emf = emf;
@@ -35,8 +37,7 @@ public class TodoHttpHandler implements HttpHandler {
                 case "DELETE" -> handleDelete(exchange, entityManager);
                 case "PATCH" -> handlePatch(exchange, entityManager);
                 case "PUT" -> handlePut(exchange, entityManager);
-                default -> HttpHelper.sendJsonError(exchange, HttpURLConnection.HTTP_BAD_METHOD,
-                        "Unsupported method");
+                default -> HttpHelper.sendJsonUnsupportedMethod(exchange);
             }
         } catch (Exception e) {
             HttpHelper.sendJsonError(exchange, HttpURLConnection.HTTP_INTERNAL_ERROR, e.getMessage());
@@ -46,17 +47,16 @@ public class TodoHttpHandler implements HttpHandler {
     }
 
     private void handlePut(HttpExchange exchange, EntityManager entityManager) throws IOException {
-        int todoId = HttpHelper.getIdFromURI(exchange, 2, TODO_ID_MISSING);
-        if (todoId != -1) {
+        var todoId = HttpHelper.getIdFromURI(exchange, 2, TodoConstant.TODO_ID_MISSING);
+        if (todoId.isPresent()) {
             String data = new String(exchange.getRequestBody().readAllBytes());
             try {
                 TodoPatch dto = TodoHandler.handlePatchTodoRequest(data);
-                Todo todo = new TodoRepository(entityManager).put(dto, todoId);
+                Todo todo = new TodoRepository(entityManager).put(dto, todoId.getAsInt());
                 HttpHelper.writeResponse(exchange, HttpURLConnection.HTTP_OK,
                         TodoHandler.getTodoResponse(todo));
             } catch (JsonSyntaxException e) {
-                HttpHelper.sendJsonError(exchange, HttpURLConnection.HTTP_BAD_REQUEST,
-                        "Malformed JSON in request body. Please check syntax and field names.");
+                HttpHelper.sendJsonMalformedJson(exchange);
             } catch (Exception e) {
                 HttpHelper.sendJsonError(exchange, HttpURLConnection.HTTP_INTERNAL_ERROR,
                         "Unexpected error: " + e.getMessage());
@@ -65,12 +65,12 @@ public class TodoHttpHandler implements HttpHandler {
     }
 
     private void handleDelete(HttpExchange exchange, EntityManager entityManager) throws IOException {
-        int todoId = HttpHelper.getIdFromURI(exchange, 2, TODO_ID_MISSING);
-        if (todoId != -1) {
+        var todoId = HttpHelper.getIdFromURI(exchange, 2, TodoConstant.TODO_ID_MISSING);
+        if (todoId.isPresent()) {
             TodoRepository todoRepository = new TodoRepository(entityManager);
-            Todo todo = todoRepository.findById(todoId);
+            Todo todo = todoRepository.findById(todoId.getAsInt());
             if (todo == null) {
-                HttpHelper.sendJsonError(exchange, HttpURLConnection.HTTP_NOT_FOUND, "Todo not found");
+                HttpHelper.sendJsonError(exchange, HttpURLConnection.HTTP_NOT_FOUND, TodoConstant.TODO_NOT_FOUND);
             } else {
                 todoRepository.delete(todo);
                 HttpHelper.sendJsonResult(exchange, HttpURLConnection.HTTP_OK,
@@ -90,31 +90,47 @@ public class TodoHttpHandler implements HttpHandler {
     }
 
     private void handleGet(HttpExchange exchange, EntityManager entityManager) throws IOException {
-        int todoId = HttpHelper.getIdFromURI(exchange, 2, TODO_ID_MISSING);
-        if (todoId != -1) {
-            Todo todo = new TodoRepository(entityManager).findById(todoId);
-            if (todo == null) {
-                HttpHelper.sendJsonError(exchange, HttpURLConnection.HTTP_NOT_FOUND,
-                        "Todo not found");
-            } else {
-                HttpHelper.writeResponse(exchange, HttpURLConnection.HTTP_OK,
-                        TodoHandler.getTodoResponse(todo));
+        var dto = HttpHelper.getUriCompactAddress(exchange, 2, TodoConstant.TODO_ID_MISSING);
+        if (dto != null) {
+            switch (dto.idCapsulatedUriString()) {
+                case ApiRoutes.TODO_BY_ID -> handleGetTodos(dto.id(), exchange, entityManager);
+                case ApiRoutes.TODO_USER -> handleGetTodosUser(dto.id(), exchange, entityManager);
+                default -> HttpHelper.sendJsonUnknownEndpoint(exchange);
             }
         }
     }
 
+    private void handleGetTodos(int id, HttpExchange exchange, EntityManager entityManager) throws IOException {
+        Todo todo = new TodoRepository(entityManager).findById(id);
+        if (todo == null) {
+            HttpHelper.sendJsonError(exchange, HttpURLConnection.HTTP_NOT_FOUND, TodoConstant.TODO_NOT_FOUND);
+        } else {
+            HttpHelper.writeResponse(exchange, HttpURLConnection.HTTP_OK,
+                    TodoHandler.getTodoResponse(todo));
+        }
+    }
+
+    private void handleGetTodosUser(int id, HttpExchange exchange, EntityManager entityManager) throws IOException {
+        Todo todo = new TodoRepository(entityManager).findById(id);
+        if (todo == null) {
+            HttpHelper.sendJsonError(exchange, HttpURLConnection.HTTP_NOT_FOUND, TodoConstant.TODO_NOT_FOUND);
+        } else {
+            HttpHelper.writeResponse(exchange, HttpURLConnection.HTTP_OK,
+                    UserHandler.getJsonUser(todo.getUser()));
+        }
+    }
+
     private void handlePatch(HttpExchange exchange, EntityManager entityManager) throws IOException {
-        int todoId = HttpHelper.getIdFromURI(exchange, 2, TODO_ID_MISSING);
-        if (todoId != -1) {
+        var todoId = HttpHelper.getIdFromURI(exchange, 2, TodoConstant.TODO_ID_MISSING);
+        if (todoId.isPresent()) {
             String data = new String(exchange.getRequestBody().readAllBytes());
             try {
                 TodoPatch dto = TodoHandler.handlePatchTodoRequest(data);
-                Todo todo = new TodoRepository(entityManager).patch(dto, todoId);
+                Todo todo = new TodoRepository(entityManager).patch(dto, todoId.getAsInt());
                 HttpHelper.writeResponse(exchange, HttpURLConnection.HTTP_OK,
                         TodoHandler.getTodoResponse(todo));
             } catch (JsonSyntaxException e) {
-                HttpHelper.sendJsonError(exchange, HttpURLConnection.HTTP_BAD_REQUEST,
-                        "Malformed JSON in request body. Please check syntax and field names.");
+                HttpHelper.sendJsonMalformedJson(exchange);
             } catch (InvocationTargetException | IllegalAccessException e) {
                 HttpHelper.sendJsonError(exchange, HttpURLConnection.HTTP_INTERNAL_ERROR,
                         "Internal server error: " + e.getMessage());

@@ -3,6 +3,7 @@ package com.keldorn.handler;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.keldorn.dto.CreateUser;
+import com.keldorn.dto.UserDto;
 import com.keldorn.dto.UserResponseDto;
 import com.keldorn.entity.User;
 import com.keldorn.util.LocalDateTimeAdapter;
@@ -19,7 +20,11 @@ public class UserHandler {
         return new User(dto.getEmail(), dto.getName());
     }
 
-    public static String getJsonUser(User user) {
+    public static String getJsonUserDetailed(User user) {
         return gson.toJson(new UserResponseDto(user));
+    }
+
+    public static String getJsonUser(User user) {
+        return gson.toJson(new UserDto(user));
     }
 }
