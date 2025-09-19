@@ -86,10 +86,10 @@ public class TodoController implements HttpHandler {
             switch (dto.idCapsulatedUriString()) {
                 case ApiRoutes.TODO_BY_ID ->
                         ControllerUtils.sendIfExists(exchange, service.findById(dto.id()),
-                                TodoMapper::getTodoResponse, USER_NOT_FOUND_ERROR);
+                                TodoMapper::getTodoResponse, TODO_NOT_FOUND_ERROR);
                 case ApiRoutes.TODO_USER ->
                         ControllerUtils.sendIfExists(exchange, service.findById(dto.id()),
-                                t -> UserMapper.getJsonUser(t.getUser()), TODO_NOT_FOUND_ERROR);
+                                t -> UserMapper.getJsonUser(t.getUser()), USER_NOT_FOUND_ERROR);
                 default -> JsonResponse.sendUnknownEndpoint(exchange);
             }
         }
