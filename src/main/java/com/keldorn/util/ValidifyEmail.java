@@ -7,7 +7,7 @@ import java.util.regex.Pattern;
 
 public class ValidifyEmail {
     private static final Pattern EMAIL_PATTERN =
-            Pattern.compile("([\\w.-]+)@(([\\w-]+\\.)+[\\w-]{2,})");
+            Pattern.compile("([\\w.-]+)@((\\w+(-\\w+)*\\.)+\\w{2,})");
 
     public static void validify(String email) throws InvalidEmailException {
         Matcher emailMatcher = EMAIL_PATTERN.matcher(email);
