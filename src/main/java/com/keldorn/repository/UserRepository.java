@@ -1,7 +1,7 @@
 package com.keldorn.repository;
 
-import com.keldorn.entity.Todo;
-import com.keldorn.entity.User;
+import com.keldorn.domain.entity.Todo;
+import com.keldorn.domain.entity.User;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityTransaction;
 

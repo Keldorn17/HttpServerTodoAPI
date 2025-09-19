@@ -1,8 +1,8 @@
 package com.keldorn.repository;
 
-import com.keldorn.dto.TodoPatch;
-import com.keldorn.entity.Todo;
-import com.keldorn.enums.Priority;
+import com.keldorn.dto.todo.TodoPatch;
+import com.keldorn.domain.entity.Todo;
+import com.keldorn.domain.enums.Priority;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityTransaction;
 import jakarta.persistence.criteria.CriteriaBuilder;
